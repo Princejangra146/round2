@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Adobe PDF Intelligence - Connecting the Dots</title>
+  
+  <link rel="stylesheet" href="styles.css" />
+  
+  <!-- Adobe PDF Embed SDK -->
+  <script src="https://documentservices.adobe.com/view-sdk/viewer.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-content">
+        <h1><span class="logo">🧠</span> PDF Intelligence Hub</h1>
+        <p>Rethink Reading. Rediscover Knowledge. Connect the Dots.</p>
+      </div>
+    </header>
+
+    <main class="main-content">
+      <!-- Mode Selection -->
+      <div class="mode-selection" id="modeSelection">
+        <h2>Choose Your Intelligence Mode</h2>
+        <div class="mode-cards">
+          <div class="mode-card" onclick="app.setMode('single')">
+            <div class="mode-icon">📄</div>
+            <h3>Single Document</h3>
+            <p>Extract outline and structure from one PDF</p>
+          </div>
+          <div class="mode-card" onclick="app.setMode('persona')">
+            <div class="mode-icon">👤</div>
+            <h3>Persona Analysis</h3>
+            <p>Analyze multiple documents for specific personas and jobs</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single Document Mode -->
+      <div class="upload-section" id="singleDocMode" style="display: none;">
+        <div class="upload-card">
+          <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📄</div>
+            <h3>Drop your PDF here or click to browse</h3>
+            <p>Maximum file size: 50MB</p>
+            <input type="file" id="fileInput" accept=".pdf" hidden />
+          </div>
+          <div class="upload-progress" id="uploadProgress" style="display: none;">
+            <div class="progress-bar">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span id="progressText">Processing...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Persona Analysis Mode -->
+      <div class="persona-section" id="personaMode" style="display: none;">
+        <div class="persona-card">
+          <h3>🎯 Persona-Driven Document Analysis</h3>
+          <div class="persona-form">
+            <div class="form-group">
+              <label for="personaInput">Persona (Who are you?)</label>
+              <input type="text" id="personaInput" placeholder="e.g., PhD Researcher in NLP or Finance Analyst" />
+            </div>
+
+            <div class="form-group">
+              <label for="jobInput">Job to be Done</label>
+              <textarea id="jobInput" placeholder="e.g., Analyze 5 papers to summarize key results"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="multiFileInput">Upload Documents (3–10 PDFs)</label>
+              <input type="file" id="multiFileInput" accept=".pdf" multiple />
+              <div class="file-list" id="fileList"></div>
+            </div>
+
+            <button id="analyzeBtn" class="analyze-btn">
+              🚀 Analyze Documents
+            </button>
+          </div>
+
+          <div class="persona-progress" id="personaProgress" style="display: none;">
+            <div class="progress-bar">
+              <div class="progress-fill" id="personaProgressFill"></div>
+            </div>
+            <span id="personaProgressText">Analyzing documents for persona...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="results-grid" id="resultsGrid" style="display: none;">
+        <!-- Sidebar Insights/Outline -->
+        <div class="sidebar">
+          <div class="persona-context-panel" id="personaContextPanel" style="display: none;">
+            <h3>🎯 Analysis Context</h3>
+            <div class="context-content" id="contextContent"></div>
+          </div>
+
+          <div class="outline-panel">
+            <h3>📋 Document Structure</h3>
+            <div class="outline-content" id="outlineContent"></div>
+          </div>
+
+          <div class="insights-panel">
+            <h3>💡 Smart Insights</h3>
+            <div class="insights-content" id="insightsContent"></div>
+          </div>
+        </div>
+
+        <!-- Main panel: Persona Results or PDF Viewer -->
+        <div class="main-panel">
+          <div class="persona-results" id="personaResults" style="display: none;">
+            <div class="results-header">
+              <h3>🧠 Persona Analysis Results</h3>
+              <div class="results-meta" id="resultsMeta"></div>
+            </div>
+            <div class="sections-ranking" id="sectionsRanking"></div>
+            <div class="subsections-analysis" id="subsectionsAnalysis"></div>
+          </div>
+
+          <div class="pdf-viewer-container" id="pdfViewerContainer">
+            <div class="viewer-header">
+              <h3 id="documentTitle">Document Viewer</h3>
+              <div class="viewer-controls">
+                <button id="fullscreenBtn" class="control-btn">⛶</button>
+                <button id="downloadBtn" class="control-btn">⬇</button>
+              </div>
+            </div>
+            <div id="adobeDCView" class="pdf-viewer"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Document Library -->
+      <div class="document-library" id="documentLibrary">
+        <h3>📚 Document Library</h3>
+        <div class="library-controls">
+          <button id="libraryPersonaBtn" class="library-btn">🎯 Analyze for Persona</button>
+          <button id="refreshLibraryBtn" class="library-btn">🔄 Refresh</button>
+        </div>
+        <div class="library-grid" id="libraryGrid"></div>
+      </div>
+    </main>
+
+    <!-- Floating Action -->
+    <div class="floating-action">
+      <button id="backToModeBtn" class="fab" onclick="app.backToModeSelection()">🏠</button>
+    </div>
+  </div>
+
+  <!-- JavaScript -->
+  <script src="script.js"></script>
+</body>
+</html>

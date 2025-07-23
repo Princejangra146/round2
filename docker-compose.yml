@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  webapp:
+    build: .
+    ports:
+      - "80:80"
+    volumes:
+      - ./input:/app/input
+      - ./output:/app/output
+    networks:
+      - none
+    environment:
+      - PYTHONPATH=/usr/local/lib/python3.11/site-packages
