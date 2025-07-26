@@ -2,9 +2,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import json
-import pdfplumber
-from sentence_transformers import SentenceTransformer
-from sklearn.metrics.pairwise import cosine_similarity
+from pdf_processor import PDFProcessor   # Your existing class
+from utils.persona_analyzer import PersonaAnalyzer  # Your existing class
 
 app = Flask(__name__)
 CORS(app)
@@ -19,110 +18,99 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@app.route('/api/health', methods=['GET'])
-def health_check():
-    return jsonify({"status": "healthy"})
+@app.route('/api/analyze-persona', methods=['POST'])
+def analyze_persona():
+    data = request.get_json()
 
-def extract_outline(pdf_path):
-    headings = []
-    with pdfplumber.open(pdf_path) as pdf:
-        for i, page in enumerate(pdf.pages, start=1):
-            text = page.extract_text() or ''
-            for line in text.split('\n'):
-                if line.strip().lower().startswith(('1 ', '2 ', 'i.', 'a)', '•')):
-                    headings.append({
-                        "text": line.strip(),
-                        "page": i,
-                        "level": "H2" if len(line) < 60 else "H3"
-                    })
-    return {
-        "title": os.path.basename(pdf_path),
-        "total_pages": len(pdf.pages),
-        "outline": headings
-    }
+    challenge_info = data.get("challenge_info", {})
+    documents = data.get("documents", [])
+    persona_obj = data.get("persona", {})
+    job_obj = data.get("job_to_be_done", {})
 
-@app.route('/api/upload', methods=['POST'])
-def upload_file():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file"}), 400
-    file = request.files['file']
-    if file.filename == '' or not allowed_file(file.filename):
-        return jsonify({"error": "Invalid file"}), 400
+    persona_role = persona_obj.get("role", "")
+    job_task = job_obj.get("task", "")
 
-    filename = file.filename
-    path = os.path.join(UPLOAD_FOLDER, filename)
-    file.save(path)
+    input_filenames = [doc.get("filename") for doc in documents if "filename" in doc]
 
-    result = extract_outline(path)
-    output_path = os.path.join(OUTPUT_FOLDER, filename.replace('.pdf', '.json'))
-    with open(output_path, 'w') as f:
-        json.dump(result, f)
-
-    return jsonify(result)
-
-@app.route('/api/upload-multiple', methods=['POST'])
-def upload_multiple():
-    files = request.files.getlist('files[]')
-    persona = request.form.get('persona')
-    job = request.form.get('job_to_be_done')
-
-    if len(files) < 3 or not persona or not job:
-        return jsonify({"error": "Need at least 3 PDFs and persona/job."}), 400
-
+    # Load and process each document
+    processor = PDFProcessor()
     results = []
-    for file in files:
-        if file and allowed_file(file.filename):
-            filename = file.filename
-            path = os.path.join(UPLOAD_FOLDER, filename)
-            file.save(path)
-            result = extract_outline(path)
-            result['filename'] = filename
-            results.append(result)
-            with open(os.path.join(OUTPUT_FOLDER, filename.replace('.pdf', '.json')), 'w') as f:
-                json.dump(result, f)
 
-    sections = [s for r in results for s in r['outline']]
-    model = SentenceTransformer('all-MiniLM-L6-v2')
-    job_vec = model.encode([job])[0]
+    for doc in documents:
+        filename = doc.get("filename")
+        title = doc.get("title", "Untitled")
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
 
-    for section in sections:
-        section_vec = model.encode([section['text']])[0]
-        section['importance_rank'] = float(cosine_similarity([job_vec], [section_vec])[0][0])
+        # Sanity check: file should exist
+        if not os.path.exists(file_path):
+            continue  # or handle error
 
-    result_data = {
+        # Extract outline/sections here using your PDFProcessor or similar
+        outline_result = processor.extractor.extract_outline(file_path)
+        outline_result['filename'] = filename
+        outline_result['title'] = title
+        results.append(outline_result)
+
+        # Save or cache JSON result if needed
+        output_path = os.path.join(OUTPUT_FOLDER, filename.replace('.pdf', '.json'))
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(outline_result, f, indent=2, ensure_ascii=False)
+
+    # Flatten all extracted sections from all documents
+    all_sections = []
+    for res in results:
+        # `outline` is assumed list of dict with 'text', 'page', etc.
+        for section in res.get('outline', []):
+            all_sections.append({
+                "document": res['filename'],
+                "section_title": section.get('text', ''),
+                "page_number": section.get('page', None),
+            })
+
+    # Perform persona-driven importance ranking (using your PersonaAnalyzer)
+    analyzer = PersonaAnalyzer()
+    # Assuming your analyzer can consume these parameters and return ranking and refined contents.
+    analysis_result = analyzer.analyze_documents_for_persona(
+        results, persona_role, job_task
+    )
+
+    # The analysis_result should include ranked sections and subsection analysis
+    # Here, adapt to produce output keys expected, e.g.:
+    # extracted_sections and subsection_analysis
+
+    # Example formatting:
+    extracted_sections = []
+    subsection_analysis = []
+
+    # Fill extracted_sections and subsection_analysis from analyzer output accordingly.
+    # For demo, using placeholders:
+    for section in analysis_result.get('extracted_sections', []):
+        extracted_sections.append({
+            "document": section.get('document', ''),
+            "section_title": section.get('section_title', ''),
+            "importance_rank": section.get('importance_rank', 1),
+            "page_number": section.get('page_number', 0),
+        })
+
+    for subsec in analysis_result.get('sub_section_analysis', []):
+        subsection_analysis.append({
+            "document": subsec.get('document', ''),
+            "refined_text": subsec.get('refined_text', ''),
+            "page_number": subsec.get('page_number', 0),
+        })
+
+    response = {
         "metadata": {
-            "persona": persona,
-            "job_to_be_done": job,
-            "documents": [r['filename'] for r in results]
+            "input_documents": input_filenames,
+            "persona": persona_role,
+            "job_to_be_done": job_task
         },
-        "extracted_sections": sorted(sections, key=lambda s: -s['importance_rank'])[:10],
-        "sub_section_analysis": sections[:10]
+        "extracted_sections": extracted_sections,
+        "subsection_analysis": subsection_analysis
     }
 
-    return jsonify({
-        "documents_processed": len(results),
-        "persona_analysis": result_data,
-        "individual_documents": results
-    })
+    return jsonify(response)
 
-@app.route('/api/outlines', methods=['GET'])
-def all_outlines():
-    outlines = []
-    for f in os.listdir(OUTPUT_FOLDER):
-        if f.endswith('.json'):
-            with open(os.path.join(OUTPUT_FOLDER, f)) as j:
-                data = json.load(j)
-                data['json_filename'] = f
-                outlines.append(data)
-    return jsonify(outlines)
-
-@app.route('/api/outline/<filename>', methods=['GET'])
-def one_outline(filename):
-    path = os.path.join(OUTPUT_FOLDER, filename.replace('.pdf', '.json'))
-    if not os.path.exists(path):
-        return jsonify({"error": "Not found"}), 404
-    with open(path) as f:
-        return jsonify(json.load(f))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8000)
